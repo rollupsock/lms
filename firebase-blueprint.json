@@ -1,0 +1,172 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Represents a user in the system (Student, Teacher, Admin, Parent).",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["student", "teacher", "admin", "parent"] },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "classCode": { "type": "string", "description": "For students logging in with a code." },
+        "childrenIds": { "type": "array", "items": { "type": "string" }, "description": "For parents, IDs of their children (students)." }
+      },
+      "required": ["uid", "role"]
+    },
+    "Class": {
+      "title": "Class",
+      "description": "A group of students assigned to a teacher.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "code": { "type": "string", "description": "Unique code for students to join." },
+        "teacherId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "code", "teacherId"]
+    },
+    "Quiz": {
+      "title": "Quiz",
+      "description": "A set of questions for students.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "courseId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "questions": { 
+          "type": "array", 
+          "items": { 
+            "type": "object",
+            "properties": {
+              "question": { "type": "string" },
+              "options": { "type": "array", "items": { "type": "string" } },
+              "correctAnswer": { "type": "string" },
+              "type": { "type": "string", "enum": ["multiple-choice", "true-false", "short-answer"] }
+            }
+          } 
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["courseId", "title"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "Discussion comments on courses.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "courseId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["courseId", "userId", "text"]
+    },
+    "Course": {
+      "title": "Course",
+      "description": "A course offered by the Madrassa.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "teacherName": { "type": "string" },
+        "category": { "type": "string" },
+        "thumbnail": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "syllabus": { "type": "array", "items": { "type": "object" } }
+      },
+      "required": ["title", "teacherId"]
+    },
+    "Enrollment": {
+      "title": "Enrollment",
+      "description": "Links a student to a course.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "courseId": { "type": "string" },
+        "enrolledAt": { "type": "string", "format": "date-time" },
+        "progress": { "type": "number", "description": "Percentage of completion." },
+        "status": { "type": "string", "enum": ["active", "completed", "dropped"] }
+      },
+      "required": ["studentId", "courseId"]
+    },
+    "Assignment": {
+      "title": "Assignment",
+      "description": "A task for students within a course.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "courseId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "dueDate": { "type": "string", "format": "date-time" },
+        "maxPoints": { "type": "number" }
+      },
+      "required": ["courseId", "title"]
+    },
+    "Submission": {
+      "title": "Submission",
+      "description": "A student's submission for an assignment.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "assignmentId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "content": { "type": "string" },
+        "submittedAt": { "type": "string", "format": "date-time" },
+        "grade": { "type": "number" },
+        "feedback": { "type": "string" }
+      },
+      "required": ["assignmentId", "studentId"]
+    },
+    "Event": {
+      "title": "Event",
+      "description": "Calendar events and holidays.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "start": { "type": "string", "format": "date-time" },
+        "end": { "type": "string", "format": "date-time" },
+        "type": { "type": "string", "enum": ["holiday", "event", "exam"] },
+        "description": { "type": "string" }
+      },
+      "required": ["title", "start"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Parent-teacher communication.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "senderId": { "type": "string" },
+        "receiverId": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "read": { "type": "boolean" }
+      },
+      "required": ["senderId", "receiverId", "text"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": { "schema": "User", "description": "User profiles." },
+    "/classes/{classId}": { "schema": "Class", "description": "Class groups." },
+    "/quizzes/{quizId}": { "schema": "Quiz", "description": "Course quizzes." },
+    "/comments/{commentId}": { "schema": "Comment", "description": "Course comments." },
+    "/courses/{courseId}": { "schema": "Course", "description": "Course details." },
+    "/enrollments/{enrollmentId}": { "schema": "Enrollment", "description": "Student enrollments." },
+    "/assignments/{assignmentId}": { "schema": "Assignment", "description": "Course assignments." },
+    "/submissions/{submissionId}": { "schema": "Submission", "description": "Assignment submissions." },
+    "/events/{eventId}": { "schema": "Event", "description": "School calendar events." },
+    "/messages/{messageId}": { "schema": "Message", "description": "Direct messages." }
+  }
+}
