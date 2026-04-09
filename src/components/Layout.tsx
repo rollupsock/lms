@@ -147,10 +147,8 @@ export default function Layout() {
         <header className="h-16 bg-white border-b border-stone-200 flex items-center justify-between px-4 md:px-8 shadow-sm z-40">
           <div className="flex items-center gap-4">
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="lg:hidden text-stone-600">
-                  <Menu size={20} />
-                </Button>
+              <SheetTrigger render={<Button variant="ghost" size="icon" className="lg:hidden text-stone-600" />}>
+                <Menu size={20} />
               </SheetTrigger>
               <SheetContent side="left" className="p-0 bg-stone-900 border-stone-800 w-64">
                 <SidebarContent />
@@ -167,15 +165,13 @@ export default function Layout() {
             </Button>
 
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                  <Avatar className="h-10 w-10 border border-stone-200">
-                    <AvatarImage src={user?.photoURL || ''} alt={user?.displayName || ''} />
-                    <AvatarFallback className="bg-stone-100 text-stone-600">
-                      <User size={20} />
-                    </AvatarFallback>
-                  </Avatar>
-                </Button>
+              <DropdownMenuTrigger render={<Button variant="ghost" className="relative h-10 w-10 rounded-full" />}>
+                <Avatar className="h-10 w-10 border border-stone-200">
+                  <AvatarImage src={user?.photoURL || ''} alt={user?.displayName || ''} />
+                  <AvatarFallback className="bg-stone-100 text-stone-600">
+                    <User size={20} />
+                  </AvatarFallback>
+                </Avatar>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">

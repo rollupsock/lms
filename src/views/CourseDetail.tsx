@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../firebase';
-import { doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp, orderBy, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp, orderBy, onSnapshot, deleteDoc, updateDoc } from 'firebase/firestore';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,8 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { 
   BookOpen, 
   ClipboardList, 
@@ -23,7 +25,11 @@ import {
   Award,
   HelpCircle,
   Send,
-  MessageCircle
+  MessageCircle,
+  MoreVertical,
+  Edit,
+  Trash,
+  Plus
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -31,6 +37,7 @@ export default function CourseDetail() {
   const { id } = useParams();
   const { t } = useTranslation();
   const [user] = useAuthState(auth);
+  const [profile, setProfile] = useState<any>(null);
   const [course, setCourse] = useState<any>(null);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [quizzes, setQuizzes] = useState<any[]>([]);
@@ -39,9 +46,17 @@ export default function CourseDetail() {
   const [enrollment, setEnrollment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  // Edit states
+  const [isSyllabusDialogOpen, setIsSyllabusDialogOpen] = useState(false);
+  const [newLesson, setNewLesson] = useState({ title: '', type: 'video', duration: '' });
+
   useEffect(() => {
     async function fetchData() {
       if (!id || !user) return;
+
+      // Profile
+      const profileSnap = await getDoc(doc(db, 'users', user.uid));
+      setProfile(profileSnap.data());
 
       // Course
       const courseSnap = await getDoc(doc(db, 'courses', id));
@@ -101,6 +116,53 @@ export default function CourseDetail() {
     }
   };
 
+  const handleAddLesson = async () => {
+    if (!newLesson.title) return;
+    const updatedSyllabus = [...(course.syllabus || []), { ...newLesson, completed: false }];
+    try {
+      await updateDoc(doc(db, 'courses', id!), { syllabus: updatedSyllabus });
+      setCourse({ ...course, syllabus: updatedSyllabus });
+      setNewLesson({ title: '', type: 'video', duration: '' });
+      setIsSyllabusDialogOpen(false);
+      toast.success('Lesson added');
+    } catch (error) {
+      toast.error('Failed to add lesson');
+    }
+  };
+
+  const handleDeleteLesson = async (index: number) => {
+    const updatedSyllabus = course.syllabus.filter((_: any, i: number) => i !== index);
+    try {
+      await updateDoc(doc(db, 'courses', id!), { syllabus: updatedSyllabus });
+      setCourse({ ...course, syllabus: updatedSyllabus });
+      toast.success('Lesson removed');
+    } catch (error) {
+      toast.error('Failed to remove lesson');
+    }
+  };
+
+  const handleDeleteAssignment = async (assignmentId: string) => {
+    if (!window.confirm('Delete this assignment?')) return;
+    try {
+      await deleteDoc(doc(db, 'assignments', assignmentId));
+      setAssignments(assignments.filter(a => a.id !== assignmentId));
+      toast.success('Assignment deleted');
+    } catch (error) {
+      toast.error('Failed to delete assignment');
+    }
+  };
+
+  const handleDeleteQuiz = async (quizId: string) => {
+    if (!window.confirm('Delete this quiz?')) return;
+    try {
+      await deleteDoc(doc(db, 'quizzes', quizId));
+      setQuizzes(quizzes.filter(q => q.id !== quizId));
+      toast.success('Quiz deleted');
+    } catch (error) {
+      toast.error('Failed to delete quiz');
+    }
+  };
+
   if (loading) return <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-stone-800"></div></div>;
   if (!course) return <div>Course not found</div>;
 
@@ -112,14 +174,14 @@ export default function CourseDetail() {
     { title: 'Advanced Topics', type: 'video', duration: '60m', completed: false },
   ];
 
+  const isInstructor = profile?.role === 'admin' || (profile?.role === 'teacher' && course.teacherId === user?.uid);
+
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Back Button */}
-      <Button variant="ghost" asChild className="text-stone-500 hover:text-stone-900 -ml-4">
-        <Link to="/courses">
-          <ArrowLeft size={18} className="mr-2" />
-          Back to Courses
-        </Link>
+      <Button variant="ghost" render={<Link to="/courses" />} className="text-stone-500 hover:text-stone-900 -ml-4">
+        <ArrowLeft size={18} className="mr-2" />
+        Back to Courses
       </Button>
 
       {/* Hero Section */}
@@ -159,6 +221,48 @@ export default function CourseDetail() {
             </TabsList>
 
             <TabsContent value="syllabus" className="space-y-4">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-serif font-bold">Course Content</h3>
+                {isInstructor && (
+                  <Dialog open={isSyllabusDialogOpen} onOpenChange={setIsSyllabusDialogOpen}>
+                    <DialogTrigger render={<Button size="sm" className="bg-stone-900 text-white gap-2" />}>
+                      <Plus size={16} />
+                      Add Lesson
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Add New Lesson</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Lesson Title</label>
+                          <Input value={newLesson.title} onChange={e => setNewLesson({...newLesson, title: e.target.value})} />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Type</label>
+                          <select 
+                            className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            value={newLesson.type}
+                            onChange={e => setNewLesson({...newLesson, type: e.target.value})}
+                          >
+                            <option value="video">Video</option>
+                            <option value="reading">Reading</option>
+                            <option value="quiz">Quiz</option>
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Duration (e.g. 15m)</label>
+                          <Input value={newLesson.duration} onChange={e => setNewLesson({...newLesson, duration: e.target.value})} />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsSyllabusDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleAddLesson} className="bg-stone-900 text-white">Add Lesson</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </div>
               {syllabus.map((item: any, index: number) => (
                 <div 
                   key={index} 
@@ -173,11 +277,21 @@ export default function CourseDetail() {
                       <p className="text-xs text-stone-500">{item.duration}</p>
                     </div>
                   </div>
-                  {item.completed ? (
-                    <CheckCircle2 className="text-green-500" size={20} />
-                  ) : (
-                    <ChevronRight className="text-stone-300 group-hover:text-stone-900 transition-colors" size={20} />
-                  )}
+                  <div className="flex items-center gap-2">
+                    {item.completed ? (
+                      <CheckCircle2 className="text-green-500" size={20} />
+                    ) : (
+                      <ChevronRight className="text-stone-300 group-hover:text-stone-900 transition-colors" size={20} />
+                    )}
+                    {isInstructor && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-stone-300 hover:text-red-600" onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteLesson(index);
+                      }}>
+                        <Trash size={14} />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </TabsContent>
@@ -185,7 +299,22 @@ export default function CourseDetail() {
             <TabsContent value="assignments" className="space-y-4">
               {assignments.length > 0 ? (
                 assignments.map((assignment) => (
-                  <Card key={assignment.id} className="border-stone-200 shadow-sm hover:shadow-md transition-shadow">
+                  <Card key={assignment.id} className="border-stone-200 shadow-sm hover:shadow-md transition-shadow relative">
+                    {isInstructor && (
+                      <div className="absolute top-2 right-2">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-8 w-8" />}>
+                            <MoreVertical size={16} />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleDeleteAssignment(assignment.id)} className="text-red-600">
+                              <Trash size={14} className="mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    )}
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-lg font-serif">{assignment.title}</CardTitle>
                       <Badge variant="outline" className="text-stone-500">
@@ -212,7 +341,22 @@ export default function CourseDetail() {
             <TabsContent value="quizzes" className="space-y-4">
               {quizzes.length > 0 ? (
                 quizzes.map((quiz) => (
-                  <Card key={quiz.id} className="border-stone-200 shadow-sm">
+                  <Card key={quiz.id} className="border-stone-200 shadow-sm relative">
+                    {isInstructor && (
+                      <div className="absolute top-2 right-2">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-8 w-8" />}>
+                            <MoreVertical size={16} />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleDeleteQuiz(quiz.id)} className="text-red-600">
+                              <Trash size={14} className="mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    )}
                     <CardContent className="p-4 flex items-center justify-between">
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 rounded-full bg-stone-50 flex items-center justify-center text-stone-800">

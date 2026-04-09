@@ -9,9 +9,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Plus, Search, BookOpen, User, Clock, Filter } from 'lucide-react';
+import { Plus, Search, BookOpen, User, Clock, Filter, MoreVertical, Edit, Trash } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { deleteDoc } from 'firebase/firestore';
 
 export default function Courses() {
   const { t } = useTranslation();
@@ -22,8 +24,9 @@ export default function Courses() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // New Course Form
+  // New/Edit Course Form
   const [newCourse, setNewCourse] = useState({ title: '', description: '', category: '' });
+  const [editingCourse, setEditingCourse] = useState<any>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   useEffect(() => {
@@ -48,27 +51,54 @@ export default function Courses() {
     fetchData();
   }, [user]);
 
-  const handleCreateCourse = async () => {
+  const handleCreateOrUpdateCourse = async () => {
     if (!newCourse.title || !newCourse.description) {
       toast.error('Please fill in all fields');
       return;
     }
 
     try {
-      const docRef = await addDoc(collection(db, 'courses'), {
-        ...newCourse,
-        teacherId: user?.uid,
-        teacherName: user?.displayName,
-        createdAt: serverTimestamp(),
-        thumbnail: `https://picsum.photos/seed/${newCourse.title}/400/250`
-      });
-      setCourses([{ id: docRef.id, ...newCourse, teacherName: user?.displayName, thumbnail: `https://picsum.photos/seed/${newCourse.title}/400/250` }, ...courses]);
+      if (editingCourse) {
+        await setDoc(doc(db, 'courses', editingCourse.id), {
+          ...newCourse,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+        setCourses(courses.map(c => c.id === editingCourse.id ? { ...c, ...newCourse } : c));
+        toast.success('Course updated successfully');
+      } else {
+        const docRef = await addDoc(collection(db, 'courses'), {
+          ...newCourse,
+          teacherId: user?.uid,
+          teacherName: user?.displayName,
+          createdAt: serverTimestamp(),
+          thumbnail: `https://picsum.photos/seed/${newCourse.title}/400/250`
+        });
+        setCourses([{ id: docRef.id, ...newCourse, teacherName: user?.displayName, thumbnail: `https://picsum.photos/seed/${newCourse.title}/400/250` }, ...courses]);
+        toast.success('Course created successfully');
+      }
       setIsDialogOpen(false);
       setNewCourse({ title: '', description: '', category: '' });
-      toast.success('Course created successfully');
+      setEditingCourse(null);
     } catch (error) {
-      toast.error('Failed to create course');
+      toast.error('Failed to save course');
     }
+  };
+
+  const handleDeleteCourse = async (courseId: string) => {
+    if (!window.confirm('Are you sure you want to delete this course?')) return;
+    try {
+      await deleteDoc(doc(db, 'courses', courseId));
+      setCourses(courses.filter(c => c.id !== courseId));
+      toast.success('Course deleted successfully');
+    } catch (error) {
+      toast.error('Failed to delete course');
+    }
+  };
+
+  const openEditDialog = (course: any) => {
+    setEditingCourse(course);
+    setNewCourse({ title: course.title, description: course.description, category: course.category });
+    setIsDialogOpen(true);
   };
 
   const handleEnroll = async (courseId: string) => {
@@ -103,17 +133,21 @@ export default function Courses() {
         </div>
 
         {(profile?.role === 'teacher' || profile?.role === 'admin') && (
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-stone-900 hover:bg-stone-800 text-white gap-2 w-full md:w-auto">
-                <Plus size={18} />
-                {t('create_course')}
-              </Button>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (!open) {
+              setEditingCourse(null);
+              setNewCourse({ title: '', description: '', category: '' });
+            }
+          }}>
+            <DialogTrigger render={<Button className="bg-stone-900 hover:bg-stone-800 text-white gap-2 w-full md:w-auto" />}>
+              <Plus size={18} />
+              {t('create_course')}
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px] w-[95vw] rounded-2xl">
               <DialogHeader>
-                <DialogTitle className="text-2xl font-serif">Create New Course</DialogTitle>
-                <CardDescription>Fill in the details to launch a new course.</CardDescription>
+                <DialogTitle className="text-2xl font-serif">{editingCourse ? 'Edit Course' : 'Create New Course'}</DialogTitle>
+                <CardDescription>{editingCourse ? 'Update the details of your course.' : 'Fill in the details to launch a new course.'}</CardDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
@@ -144,7 +178,9 @@ export default function Courses() {
               </div>
               <DialogFooter className="flex-col sm:flex-row gap-2">
                 <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="w-full sm:w-auto">Cancel</Button>
-                <Button onClick={handleCreateCourse} className="bg-stone-900 hover:bg-stone-800 text-white w-full sm:w-auto">Create Course</Button>
+                <Button onClick={handleCreateOrUpdateCourse} className="bg-stone-900 hover:bg-stone-800 text-white w-full sm:w-auto">
+                  {editingCourse ? 'Update Course' : 'Create Course'}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -170,7 +206,26 @@ export default function Courses() {
       {/* Course Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
         {filteredCourses.map((course) => (
-          <Card key={course.id} className="group border-stone-200 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col">
+          <Card key={course.id} className="group border-stone-200 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col relative">
+            {(profile?.role === 'admin' || (profile?.role === 'teacher' && course.teacherId === user?.uid)) && (
+              <div className="absolute top-2 left-2 z-10">
+                <DropdownMenu>
+                  <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" className="bg-white/80 backdrop-blur-sm hover:bg-white" />}>
+                    <MoreVertical size={16} />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem onClick={() => openEditDialog(course)}>
+                      <Edit size={14} className="mr-2" />
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleDeleteCourse(course.id)} className="text-red-600">
+                      <Trash size={14} className="mr-2" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
             <div className="relative h-48 overflow-hidden">
               <img 
                 src={course.thumbnail || `https://picsum.photos/seed/${course.id}/400/250`} 
@@ -206,8 +261,8 @@ export default function Courses() {
             </CardContent>
             <CardFooter className="border-t border-stone-50 bg-stone-50/50 p-4">
               {enrollments.includes(course.id) ? (
-                <Button asChild className="w-full bg-stone-100 text-stone-800 hover:bg-stone-200 border border-stone-200">
-                  <Link to={`/courses/${course.id}`}>Continue Learning</Link>
+                <Button render={<Link to={`/courses/${course.id}`} />} className="w-full bg-stone-100 text-stone-800 hover:bg-stone-200 border border-stone-200">
+                  Continue Learning
                 </Button>
               ) : (
                 <Button 
