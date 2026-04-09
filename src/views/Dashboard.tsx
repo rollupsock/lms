@@ -108,18 +108,30 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-serif font-bold text-stone-900">
-            {t('welcome')}, {profile?.displayName || user?.displayName}
-          </h1>
-          <p className="text-stone-500 mt-1">
-            {profile?.role === 'student' 
-              ? `Active in class: ${profile?.classCode || 'General'}`
-              : "Here's what's happening at Madrassa Fikriyya today."}
-          </p>
+      {/* Banner Image */}
+      <div className="relative h-48 md:h-64 rounded-3xl overflow-hidden shadow-2xl">
+        <img 
+          src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=2070" 
+          alt="Madrassa Fikriyya Banner" 
+          className="w-full h-full object-cover"
+          referrerPolicy="no-referrer"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-stone-900/80 via-stone-900/20 to-transparent flex items-end p-8">
+          <div className="text-white">
+            <h1 className="text-3xl md:text-5xl font-serif font-bold tracking-tight">
+              {t('welcome')}, {profile?.displayName || user?.displayName}
+            </h1>
+            <p className="text-stone-200 mt-2 text-lg opacity-90">
+              {profile?.role === 'student' 
+                ? `Active in class: ${profile?.classCode || 'General'}`
+                : "Empowering the next generation of Islamic thinkers."}
+            </p>
+          </div>
         </div>
+      </div>
+
+      {/* Header Info (Simplified) */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="bg-stone-100 text-stone-700 border-stone-200 px-3 py-1">
             <Clock size={14} className="mr-2" />
@@ -253,7 +265,7 @@ export default function Dashboard() {
                 <div className="text-center py-12 text-stone-500">
                   <BookOpen className="mx-auto mb-4 opacity-20" size={48} />
                   <p>No courses found. Explore the course catalog to get started!</p>
-                  <Button render={<Link to="/courses" />} className="mt-4 bg-stone-900 text-white">Browse Courses</Button>
+                  <Button render={<Link to="/courses" />} nativeButton={false} className="mt-4 bg-stone-900 text-white">Browse Courses</Button>
                 </div>
               )}
             </CardContent>

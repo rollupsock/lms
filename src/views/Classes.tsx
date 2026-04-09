@@ -11,12 +11,16 @@ import { Users, Plus, Copy, Check, Trash, UserMinus, ChevronDown, ChevronUp } fr
 import { toast } from 'sonner';
 import { deleteDoc, doc, updateDoc } from 'firebase/firestore';
 
+import { ResourceList, Resource } from '../components/ResourceList';
+import { ResourceForm } from '../components/ResourceForm';
+
 export default function Classes() {
   const { t } = useTranslation();
   const [user] = useAuthState(auth);
   const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [newClassName, setNewClassName] = useState('');
+  const [newClassBanner, setNewClassBanner] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [expandedClass, setExpandedClass] = useState<string | null>(null);
   const [students, setStudents] = useState<Record<string, any[]>>({});
@@ -59,10 +63,13 @@ export default function Classes() {
         name: newClassName,
         code,
         teacherId: user.uid,
+        bannerUrl: newClassBanner || `https://picsum.photos/seed/${code}/800/200`,
+        resources: [],
         createdAt: serverTimestamp()
       });
-      setClasses([...classes, { id: docRef.id, name: newClassName, code, teacherId: user.uid }]);
+      setClasses([...classes, { id: docRef.id, name: newClassName, code, teacherId: user.uid, bannerUrl: newClassBanner || `https://picsum.photos/seed/${code}/800/200`, resources: [] }]);
       setNewClassName('');
+      setNewClassBanner('');
       toast.success('Class created successfully');
     } catch (error) {
       toast.error('Failed to create class');
@@ -103,6 +110,35 @@ export default function Classes() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const handleAddResource = async (classId: string, resource: Resource) => {
+    try {
+      const cls = classes.find(c => c.id === classId);
+      const updatedResources = [...(cls.resources || []), resource];
+      await updateDoc(doc(db, 'classes', classId), {
+        resources: updatedResources
+      });
+      setClasses(classes.map(c => c.id === classId ? { ...c, resources: updatedResources } : c));
+      toast.success('Resource added to class');
+    } catch (error) {
+      toast.error('Failed to add resource');
+    }
+  };
+
+  const handleDeleteResource = async (classId: string, index: number) => {
+    try {
+      const cls = classes.find(c => c.id === classId);
+      const updatedResources = [...(cls.resources || [])];
+      updatedResources.splice(index, 1);
+      await updateDoc(doc(db, 'classes', classId), {
+        resources: updatedResources
+      });
+      setClasses(classes.map(c => c.id === classId ? { ...c, resources: updatedResources } : c));
+      toast.success('Resource removed');
+    } catch (error) {
+      toast.error('Failed to remove resource');
+    }
+  };
+
   if (loading) return <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-stone-800"></div></div>;
 
   return (
@@ -120,20 +156,31 @@ export default function Classes() {
           <CardDescription>Students will use the generated code to join your class.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleCreateClass} className="flex gap-4">
-            <div className="flex-1 space-y-2">
-              <Label htmlFor="className">Class Name</Label>
-              <Input 
-                id="className" 
-                placeholder="e.g., Grade 5 - Quranic Studies" 
-                value={newClassName}
-                onChange={e => setNewClassName(e.target.value)}
-              />
+          <form onSubmit={handleCreateClass} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="className">Class Name</Label>
+                <Input 
+                  id="className" 
+                  placeholder="e.g., Grade 5 - Quranic Studies" 
+                  value={newClassName}
+                  onChange={e => setNewClassName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="classBanner">Banner Image URL (Optional)</Label>
+                <Input 
+                  id="classBanner" 
+                  placeholder="https://..." 
+                  value={newClassBanner}
+                  onChange={e => setNewClassBanner(e.target.value)}
+                />
+              </div>
             </div>
-            <div className="flex items-end">
+            <div className="flex justify-end">
               <Button type="submit" className="bg-stone-900 text-white gap-2 h-10">
                 <Plus size={18} />
-                Create
+                Create Class
               </Button>
             </div>
           </form>
@@ -143,6 +190,11 @@ export default function Classes() {
       <div className="grid grid-cols-1 gap-6">
         {classes.map((cls) => (
           <Card key={cls.id} className="border-stone-200 shadow-sm hover:shadow-md transition-all overflow-hidden">
+            {cls.bannerUrl && (
+              <div className="h-32 w-full overflow-hidden">
+                <img src={cls.bannerUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              </div>
+            )}
             <CardContent className="p-0">
               <div className="p-6 flex items-center justify-between">
                 <div className="flex items-center gap-4">
@@ -178,9 +230,22 @@ export default function Classes() {
               </div>
 
               {expandedClass === cls.id && (
-                <div className="border-t border-stone-100 bg-stone-50/50 p-6 animate-in slide-in-from-top-2 duration-300">
-                  <h4 className="text-sm font-bold text-stone-900 mb-4">Enrolled Students</h4>
-                  {students[cls.id]?.length > 0 ? (
+                <div className="border-t border-stone-100 bg-stone-50/50 p-6 animate-in slide-in-from-top-2 duration-300 space-y-8">
+                  <div>
+                    <h4 className="text-sm font-bold text-stone-900 mb-4">Class Resources</h4>
+                    <div className="space-y-4">
+                      <ResourceForm onAdd={(res) => handleAddResource(cls.id, res)} />
+                      <ResourceList 
+                        resources={cls.resources || []} 
+                        isEditable={true} 
+                        onDelete={(idx) => handleDeleteResource(cls.id, idx)} 
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="text-sm font-bold text-stone-900 mb-4">Enrolled Students</h4>
+                    {students[cls.id]?.length > 0 ? (
                     <div className="space-y-3">
                       {students[cls.id].map((student) => (
                         <div key={student.id} className="flex items-center justify-between bg-white p-3 rounded-xl border border-stone-200 shadow-sm">
@@ -205,7 +270,8 @@ export default function Classes() {
                     <p className="text-sm text-stone-500 text-center py-4 italic">No students joined yet.</p>
                   )}
                 </div>
-              )}
+              </div>
+            )}
             </CardContent>
           </Card>
         ))}

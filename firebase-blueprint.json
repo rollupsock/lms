@@ -25,6 +25,18 @@
         "name": { "type": "string" },
         "code": { "type": "string", "description": "Unique code for students to join." },
         "teacherId": { "type": "string" },
+        "bannerUrl": { "type": "string" },
+        "resources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": { "type": "string", "enum": ["image", "video", "file", "link"] },
+              "url": { "type": "string" },
+              "title": { "type": "string" }
+            }
+          }
+        },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["name", "code", "teacherId"]
@@ -80,6 +92,17 @@
         "teacherName": { "type": "string" },
         "category": { "type": "string" },
         "thumbnail": { "type": "string" },
+        "resources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": { "type": "string", "enum": ["image", "video", "file", "link"] },
+              "url": { "type": "string" },
+              "title": { "type": "string" }
+            }
+          }
+        },
         "createdAt": { "type": "string", "format": "date-time" },
         "syllabus": { "type": "array", "items": { "type": "object" } }
       },
@@ -109,7 +132,18 @@
         "title": { "type": "string" },
         "description": { "type": "string" },
         "dueDate": { "type": "string", "format": "date-time" },
-        "maxPoints": { "type": "number" }
+        "maxPoints": { "type": "number" },
+        "resources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": { "type": "string", "enum": ["image", "video", "file", "link"] },
+              "url": { "type": "string" },
+              "title": { "type": "string" }
+            }
+          }
+        }
       },
       "required": ["courseId", "title"]
     },

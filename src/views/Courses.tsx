@@ -15,6 +15,9 @@ import { Link } from 'react-router-dom';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { deleteDoc } from 'firebase/firestore';
 
+import { ResourceList, Resource } from '../components/ResourceList';
+import { ResourceForm } from '../components/ResourceForm';
+
 export default function Courses() {
   const { t } = useTranslation();
   const [user] = useAuthState(auth);
@@ -25,7 +28,7 @@ export default function Courses() {
   const [searchQuery, setSearchQuery] = useState('');
   
   // New/Edit Course Form
-  const [newCourse, setNewCourse] = useState({ title: '', description: '', category: '' });
+  const [newCourse, setNewCourse] = useState({ title: '', description: '', category: '', resources: [] as Resource[] });
   const [editingCourse, setEditingCourse] = useState<any>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -77,7 +80,7 @@ export default function Courses() {
         toast.success('Course created successfully');
       }
       setIsDialogOpen(false);
-      setNewCourse({ title: '', description: '', category: '' });
+      setNewCourse({ title: '', description: '', category: '', resources: [] });
       setEditingCourse(null);
     } catch (error) {
       toast.error('Failed to save course');
@@ -97,7 +100,12 @@ export default function Courses() {
 
   const openEditDialog = (course: any) => {
     setEditingCourse(course);
-    setNewCourse({ title: course.title, description: course.description, category: course.category });
+    setNewCourse({ 
+      title: course.title, 
+      description: course.description, 
+      category: course.category,
+      resources: course.resources || []
+    });
     setIsDialogOpen(true);
   };
 
@@ -173,6 +181,19 @@ export default function Courses() {
                     className="min-h-[100px]"
                     value={newCourse.description}
                     onChange={e => setNewCourse({...newCourse, description: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Resources</label>
+                  <ResourceForm onAdd={(res) => setNewCourse({...newCourse, resources: [...newCourse.resources, res]})} />
+                  <ResourceList 
+                    resources={newCourse.resources} 
+                    isEditable={true} 
+                    onDelete={(idx) => {
+                      const updated = [...newCourse.resources];
+                      updated.splice(idx, 1);
+                      setNewCourse({...newCourse, resources: updated});
+                    }} 
                   />
                 </div>
               </div>
@@ -261,7 +282,7 @@ export default function Courses() {
             </CardContent>
             <CardFooter className="border-t border-stone-50 bg-stone-50/50 p-4">
               {enrollments.includes(course.id) ? (
-                <Button render={<Link to={`/courses/${course.id}`} />} className="w-full bg-stone-100 text-stone-800 hover:bg-stone-200 border border-stone-200">
+                <Button render={<Link to={`/courses/${course.id}`} />} nativeButton={false} className="w-full bg-stone-100 text-stone-800 hover:bg-stone-200 border border-stone-200">
                   Continue Learning
                 </Button>
               ) : (

@@ -47,21 +47,40 @@ export default function Login() {
       }
 
       // Sign in anonymously
-      const cred = await signInAnonymously(auth);
+      let cred;
+      try {
+        cred = await signInAnonymously(auth);
+      } catch (authError: any) {
+        console.error('Anonymous auth failed:', authError);
+        if (authError.code === 'auth/operation-not-allowed') {
+          toast.error('Student login is currently disabled. Please contact the administrator.');
+        } else {
+          toast.error('Authentication failed: ' + authError.message);
+        }
+        setLoading(false);
+        return;
+      }
       
       // Create user profile
-      await setDoc(doc(db, 'users', cred.user.uid), {
-        uid: cred.user.uid,
-        displayName: studentName,
-        role: 'student',
-        classCode: classCode,
-        createdAt: serverTimestamp()
-      });
+      try {
+        await setDoc(doc(db, 'users', cred.user.uid), {
+          uid: cred.user.uid,
+          displayName: studentName,
+          role: 'student',
+          classCode: classCode,
+          createdAt: serverTimestamp()
+        });
+      } catch (dbError: any) {
+        console.error('Profile creation failed:', dbError);
+        toast.error('Failed to create student profile: ' + dbError.message);
+        setLoading(false);
+        return;
+      }
 
       toast.success('Welcome, ' + studentName);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Student login failed:', error);
-      toast.error('Login failed. Please try again.');
+      toast.error('Login failed: ' + (error.message || 'Unknown error'));
     } finally {
       setLoading(false);
     }

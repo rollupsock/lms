@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ClipboardList, Clock, CheckCircle2, AlertCircle, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ResourceList } from '../components/ResourceList';
 
 export default function Assignments() {
   const { t } = useTranslation();
@@ -119,10 +120,18 @@ function AssignmentCard({ assignment, status }: { assignment: any, status: strin
         <p className="text-sm text-stone-600 line-clamp-2">
           {assignment.description}
         </p>
+
+        {assignment.resources && assignment.resources.length > 0 && (
+          <div className="pt-2">
+            <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-2">Resources</p>
+            <ResourceList resources={assignment.resources} />
+          </div>
+        )}
+
         <div className="flex items-center justify-between pt-4 border-t border-stone-50">
           <div className="flex items-center gap-2 text-xs text-stone-400">
             <Clock size={14} />
-            <span>Due {new Date(assignment.dueDate?.seconds * 1000 || Date.now()).toLocaleDateString()}</span>
+            <span>Due {new Date(assignment.dueDate?.seconds * 1000 || assignment.dueDate).toLocaleDateString()}</span>
           </div>
           <Button size="sm" className="bg-stone-900 hover:bg-stone-800 text-white rounded-lg">
             View Task

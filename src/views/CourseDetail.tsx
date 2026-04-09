@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -33,6 +34,9 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { ResourceList, Resource } from '../components/ResourceList';
+import { ResourceForm } from '../components/ResourceForm';
+
 export default function CourseDetail() {
   const { id } = useParams();
   const { t } = useTranslation();
@@ -48,7 +52,9 @@ export default function CourseDetail() {
 
   // Edit states
   const [isSyllabusDialogOpen, setIsSyllabusDialogOpen] = useState(false);
+  const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
   const [newLesson, setNewLesson] = useState({ title: '', type: 'video', duration: '' });
+  const [newAssignment, setNewAssignment] = useState({ title: '', description: '', dueDate: '', maxPoints: 100, resources: [] as Resource[] });
 
   useEffect(() => {
     async function fetchData() {
@@ -163,6 +169,52 @@ export default function CourseDetail() {
     }
   };
 
+  const handleAddAssignment = async () => {
+    if (!newAssignment.title || !newAssignment.dueDate) return;
+    try {
+      const docRef = await addDoc(collection(db, 'assignments'), {
+        ...newAssignment,
+        courseId: id,
+        teacherId: user?.uid,
+        dueDate: new Date(newAssignment.dueDate),
+        createdAt: serverTimestamp()
+      });
+      setAssignments([...assignments, { id: docRef.id, ...newAssignment, dueDate: { seconds: new Date(newAssignment.dueDate).getTime() / 1000 } }]);
+      setNewAssignment({ title: '', description: '', dueDate: '', maxPoints: 100, resources: [] });
+      setIsAssignmentDialogOpen(false);
+      toast.success('Assignment created');
+    } catch (error) {
+      toast.error('Failed to create assignment');
+    }
+  };
+
+  const handleAddResource = async (resource: Resource) => {
+    try {
+      const updatedResources = [...(course.resources || []), resource];
+      await updateDoc(doc(db, 'courses', id!), {
+        resources: updatedResources
+      });
+      setCourse({ ...course, resources: updatedResources });
+      toast.success('Resource added');
+    } catch (error) {
+      toast.error('Failed to add resource');
+    }
+  };
+
+  const handleDeleteResource = async (index: number) => {
+    try {
+      const updatedResources = [...(course.resources || [])];
+      updatedResources.splice(index, 1);
+      await updateDoc(doc(db, 'courses', id!), {
+        resources: updatedResources
+      });
+      setCourse({ ...course, resources: updatedResources });
+      toast.success('Resource removed');
+    } catch (error) {
+      toast.error('Failed to remove resource');
+    }
+  };
+
   if (loading) return <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-stone-800"></div></div>;
   if (!course) return <div>Course not found</div>;
 
@@ -179,7 +231,7 @@ export default function CourseDetail() {
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Back Button */}
-      <Button variant="ghost" render={<Link to="/courses" />} className="text-stone-500 hover:text-stone-900 -ml-4">
+      <Button variant="ghost" render={<Link to="/courses" />} nativeButton={false} className="text-stone-500 hover:text-stone-900 -ml-4">
         <ArrowLeft size={18} className="mr-2" />
         Back to Courses
       </Button>
@@ -211,6 +263,9 @@ export default function CourseDetail() {
               </TabsTrigger>
               <TabsTrigger value="assignments" className="rounded-lg px-6 py-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 Assignments
+              </TabsTrigger>
+              <TabsTrigger value="resources" className="rounded-lg px-6 py-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                Resources
               </TabsTrigger>
               <TabsTrigger value="quizzes" className="rounded-lg px-6 py-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 Quizzes
@@ -297,6 +352,63 @@ export default function CourseDetail() {
             </TabsContent>
 
             <TabsContent value="assignments" className="space-y-4">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-serif font-bold">Assignments</h3>
+                {isInstructor && (
+                  <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
+                    <DialogTrigger render={<Button size="sm" className="bg-stone-900 text-white gap-2" />}>
+                      <Plus size={16} />
+                      New Assignment
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl">
+                      <DialogHeader>
+                        <DialogTitle>Create New Assignment</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label>Title</Label>
+                          <Input value={newAssignment.title} onChange={e => setNewAssignment({...newAssignment, title: e.target.value})} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Description</Label>
+                          <textarea 
+                            className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            value={newAssignment.description}
+                            onChange={e => setNewAssignment({...newAssignment, description: e.target.value})}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Due Date</Label>
+                            <Input type="date" value={newAssignment.dueDate} onChange={e => setNewAssignment({...newAssignment, dueDate: e.target.value})} />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Max Points</Label>
+                            <Input type="number" value={newAssignment.maxPoints} onChange={e => setNewAssignment({...newAssignment, maxPoints: parseInt(e.target.value)})} />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Resources</Label>
+                          <ResourceForm onAdd={(res) => setNewAssignment({...newAssignment, resources: [...newAssignment.resources, res]})} />
+                          <ResourceList 
+                            resources={newAssignment.resources} 
+                            isEditable={true} 
+                            onDelete={(idx) => {
+                              const updated = [...newAssignment.resources];
+                              updated.splice(idx, 1);
+                              setNewAssignment({...newAssignment, resources: updated});
+                            }} 
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsAssignmentDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleAddAssignment} className="bg-stone-900 text-white">Create Assignment</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </div>
               {assignments.length > 0 ? (
                 assignments.map((assignment) => (
                   <Card key={assignment.id} className="border-stone-200 shadow-sm hover:shadow-md transition-shadow relative">
@@ -321,10 +433,18 @@ export default function CourseDetail() {
                         {assignment.maxPoints} pts
                       </Badge>
                     </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-stone-600 mb-4">{assignment.description}</p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-stone-400">Due: {new Date(assignment.dueDate?.seconds * 1000).toLocaleDateString()}</span>
+                    <CardContent className="space-y-4">
+                      <p className="text-sm text-stone-600">{assignment.description}</p>
+                      
+                      {assignment.resources && assignment.resources.length > 0 && (
+                        <div className="pt-2">
+                          <p className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-2">Resources</p>
+                          <ResourceList resources={assignment.resources} />
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between pt-2">
+                        <span className="text-xs text-stone-400">Due: {new Date(assignment.dueDate?.seconds * 1000 || assignment.dueDate).toLocaleDateString()}</span>
                         <Button variant="outline" size="sm" className="border-stone-200 hover:bg-stone-50">View Details</Button>
                       </div>
                     </CardContent>
@@ -336,6 +456,27 @@ export default function CourseDetail() {
                   <p className="text-stone-500">No assignments posted yet.</p>
                 </div>
               )}
+            </TabsContent>
+
+            <TabsContent value="resources" className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-serif font-bold text-stone-900">Course Resources</h3>
+              </div>
+              
+              {isInstructor && (
+                <div className="space-y-4">
+                  <h4 className="text-sm font-medium text-stone-700">Add New Resource</h4>
+                  <ResourceForm onAdd={handleAddResource} />
+                </div>
+              )}
+
+              <div className="pt-4">
+                <ResourceList 
+                  resources={course.resources || []} 
+                  isEditable={isInstructor}
+                  onDelete={handleDeleteResource}
+                />
+              </div>
             </TabsContent>
 
             <TabsContent value="quizzes" className="space-y-4">
