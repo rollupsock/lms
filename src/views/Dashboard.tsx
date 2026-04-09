@@ -311,9 +311,15 @@ export default function Dashboard() {
                         <AvatarImage src={student.photoURL} />
                         <AvatarFallback>{student.displayName?.charAt(0)}</AvatarFallback>
                       </Avatar>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="text-sm font-bold text-stone-900 truncate">{student.displayName}</p>
-                        <p className="text-xs text-stone-500 truncate">{student.email}</p>
+                        <div className="flex items-center gap-2 text-[10px] text-stone-400 uppercase tracking-wider">
+                          <span>{student.gender || 'student'}</span>
+                          {student.age && <span>• {student.age} yrs</span>}
+                        </div>
+                        {student.contactNumber && (
+                          <p className="text-[10px] text-stone-500 mt-1 truncate">{student.contactNumber}</p>
+                        )}
                       </div>
                     </div>
                   ))}

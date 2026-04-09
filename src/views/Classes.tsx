@@ -7,9 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Users, Plus, Copy, Check, Trash, UserMinus, ChevronDown, ChevronUp } from 'lucide-react';
+import { Users, Plus, Copy, Check, Trash, UserMinus, ChevronDown, ChevronUp, UserPlus, Phone, MapPin, User as UserIcon } from 'lucide-react';
 import { toast } from 'sonner';
-import { deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { deleteDoc, doc, updateDoc, setDoc } from 'firebase/firestore';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 import { ResourceList, Resource } from '../components/ResourceList';
 import { ResourceForm } from '../components/ResourceForm';
@@ -24,6 +26,18 @@ export default function Classes() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [expandedClass, setExpandedClass] = useState<string | null>(null);
   const [students, setStudents] = useState<Record<string, any[]>>({});
+
+  // Registration state
+  const [isRegisterDialogOpen, setIsRegisterDialogOpen] = useState(false);
+  const [registeringClassId, setRegisteringClassId] = useState<string | null>(null);
+  const [newStudent, setNewStudent] = useState({
+    displayName: '',
+    age: '',
+    gender: 'male',
+    parentName: '',
+    contactNumber: '',
+    address: ''
+  });
 
   useEffect(() => {
     async function fetchClasses() {
@@ -100,6 +114,51 @@ export default function Classes() {
       toast.success('Student removed from class');
     } catch (error) {
       toast.error('Failed to remove student');
+    }
+  };
+
+  const handleRegisterStudent = async () => {
+    if (!newStudent.displayName || !registeringClassId) {
+      toast.error('Student name is required');
+      return;
+    }
+
+    const classObj = classes.find(c => c.id === registeringClassId);
+    if (!classObj) return;
+
+    try {
+      const studentId = `manual_${Date.now()}`;
+      await setDoc(doc(db, 'users', studentId), {
+        uid: studentId,
+        displayName: newStudent.displayName,
+        role: 'student',
+        classCode: classObj.code,
+        age: parseInt(newStudent.age) || null,
+        gender: newStudent.gender,
+        parentName: newStudent.parentName,
+        contactNumber: newStudent.contactNumber,
+        address: newStudent.address,
+        createdAt: serverTimestamp()
+      });
+
+      const studentData = { id: studentId, ...newStudent, classCode: classObj.code };
+      setStudents(prev => ({
+        ...prev,
+        [registeringClassId]: [...(prev[registeringClassId] || []), studentData]
+      }));
+
+      setIsRegisterDialogOpen(false);
+      setNewStudent({
+        displayName: '',
+        age: '',
+        gender: 'male',
+        parentName: '',
+        contactNumber: '',
+        address: ''
+      });
+      toast.success('Student registered successfully');
+    } catch (error) {
+      toast.error('Failed to register student');
     }
   };
 
@@ -219,6 +278,18 @@ export default function Classes() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="text-stone-600 border-stone-200 gap-2"
+                    onClick={() => {
+                      setRegisteringClassId(cls.id);
+                      setIsRegisterDialogOpen(true);
+                    }}
+                  >
+                    <UserPlus size={16} />
+                    Register
+                  </Button>
                   <Button variant="ghost" size="sm" className="text-stone-500" onClick={() => toggleExpand(cls)}>
                     {expandedClass === cls.id ? <ChevronUp size={18} className="mr-2" /> : <ChevronDown size={18} className="mr-2" />}
                     Students
@@ -246,36 +317,143 @@ export default function Classes() {
                   <div>
                     <h4 className="text-sm font-bold text-stone-900 mb-4">Enrolled Students</h4>
                     {students[cls.id]?.length > 0 ? (
-                    <div className="space-y-3">
-                      {students[cls.id].map((student) => (
-                        <div key={student.id} className="flex items-center justify-between bg-white p-3 rounded-xl border border-stone-200 shadow-sm">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-stone-100 flex items-center justify-center text-stone-600 text-xs font-bold">
-                              {student.displayName?.charAt(0)}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {students[cls.id].map((student: any) => (
+                        <div key={student.id} className="bg-white p-4 rounded-xl border border-stone-200 shadow-sm space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-600 text-sm font-bold">
+                                {student.displayName?.charAt(0)}
+                              </div>
+                              <div>
+                                <span className="text-sm font-bold text-stone-800 block">{student.displayName}</span>
+                                <span className="text-[10px] text-stone-400 uppercase tracking-wider">{student.gender} • {student.age || '?'} yrs</span>
+                              </div>
                             </div>
-                            <span className="text-sm font-medium text-stone-800">{student.displayName}</span>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-stone-300 hover:text-red-600"
+                              onClick={() => handleRemoveStudent(student.id, cls.id)}
+                            >
+                              <UserMinus size={16} />
+                            </Button>
                           </div>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-stone-400 hover:text-red-600"
-                            onClick={() => handleRemoveStudent(student.id, cls.id)}
-                          >
-                            <UserMinus size={16} />
-                          </Button>
+                          
+                          {(student.parentName || student.contactNumber) && (
+                            <div className="pt-3 border-t border-stone-50 space-y-2">
+                              {student.parentName && (
+                                <div className="flex items-center gap-2 text-xs text-stone-500">
+                                  <UserIcon size={12} className="text-stone-300" />
+                                  <span>Parent: <span className="font-medium text-stone-700">{student.parentName}</span></span>
+                                </div>
+                              )}
+                              {student.contactNumber && (
+                                <div className="flex items-center gap-2 text-xs text-stone-500">
+                                  <Phone size={12} className="text-stone-300" />
+                                  <span>Contact: <span className="font-medium text-stone-700">{student.contactNumber}</span></span>
+                                </div>
+                              )}
+                              {student.address && (
+                                <div className="flex items-center gap-2 text-xs text-stone-500">
+                                  <MapPin size={12} className="text-stone-300" />
+                                  <span className="truncate">{student.address}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
                   ) : (
                     <p className="text-sm text-stone-500 text-center py-4 italic">No students joined yet.</p>
                   )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
             </CardContent>
           </Card>
         ))}
       </div>
+
+      {/* Register Student Dialog */}
+      <Dialog open={isRegisterDialogOpen} onOpenChange={setIsRegisterDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-2xl">Register New Student</DialogTitle>
+            <DialogDescription>
+              Add student details manually to enroll them in this class.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="name" className="text-right">Full Name</Label>
+              <Input 
+                id="name" 
+                className="col-span-3" 
+                value={newStudent.displayName}
+                onChange={e => setNewStudent({...newStudent, displayName: e.target.value})}
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="age" className="text-right">Age</Label>
+              <Input 
+                id="age" 
+                type="number"
+                className="col-span-3" 
+                value={newStudent.age}
+                onChange={e => setNewStudent({...newStudent, age: e.target.value})}
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="gender" className="text-right">Gender</Label>
+              <Select 
+                value={newStudent.gender} 
+                onValueChange={(val) => setNewStudent({...newStudent, gender: val})}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select gender" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="male">Male</SelectItem>
+                  <SelectItem value="female">Female</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="parent" className="text-right">Parent Name</Label>
+              <Input 
+                id="parent" 
+                className="col-span-3" 
+                value={newStudent.parentName}
+                onChange={e => setNewStudent({...newStudent, parentName: e.target.value})}
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="contact" className="text-right">Contact #</Label>
+              <Input 
+                id="contact" 
+                className="col-span-3" 
+                value={newStudent.contactNumber}
+                onChange={e => setNewStudent({...newStudent, contactNumber: e.target.value})}
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="address" className="text-right">Address</Label>
+              <Input 
+                id="address" 
+                className="col-span-3" 
+                value={newStudent.address}
+                onChange={e => setNewStudent({...newStudent, address: e.target.value})}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRegisterDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleRegisterStudent} className="bg-stone-900 text-white">Register Student</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

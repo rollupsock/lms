@@ -10,6 +10,11 @@
         "displayName": { "type": "string" },
         "role": { "type": "string", "enum": ["student", "teacher", "admin", "parent"] },
         "photoURL": { "type": "string" },
+        "age": { "type": "number" },
+        "gender": { "type": "string", "enum": ["male", "female"] },
+        "parentName": { "type": "string" },
+        "contactNumber": { "type": "string" },
+        "address": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" },
         "classCode": { "type": "string", "description": "For students logging in with a code." },
         "childrenIds": { "type": "array", "items": { "type": "string" }, "description": "For parents, IDs of their children (students)." }
